@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Tracker (Google Sheets)</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Styles are minified for brevity but are the same as before */
+        body{font-family:'Nunito',sans-serif;margin:0;padding:0;background-color:#f8f9fa;color:#495057;line-height:1.7;font-size:15px;-webkit-font-smoothing:antialiased}.container{width:95%;max-width:1100px;margin:30px auto;background-color:#fff;padding:40px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.08)}h1{text-align:center;color:#3b82f6;margin-bottom:30px;font-size:2.5em;font-weight:700}label{display:block;margin-bottom:10px;color:#6c757d;font-weight:600;font-size:.95em}.form-row{display:flex;flex-wrap:wrap;gap:25px;margin-bottom:25px}.form-row>div{flex:1;min-width:250px}input[type=text],input[type=date],textarea,select{width:100%;padding:14px;margin-bottom:0;border:1px solid #ced4da;border-radius:8px;box-sizing:border-box;font-size:16px;color:#495057;background-color:#f8f9fa;transition:border-color .3s ease,box-shadow .3s ease}input[type=text]:focus,input[type=date]:focus,textarea:focus,select:focus{border-color:#3b82f6;outline:0;box-shadow:0 0 0 2px rgba(59,130,246,.2);background-color:#fff}textarea{resize:vertical;min-height:120px}#branch-checkboxes{max-height:200px;overflow-y:auto;border:1px solid #ced4da;border-radius:8px;padding:15px;background-color:#f8f9fa}.checkbox-label{display:block;margin-bottom:8px;cursor:pointer;font-weight:400}.checkbox-label input{margin-right:10px;vertical-align:middle;transform:scale(1.1)}.button-group{display:flex;justify-content:flex-end;margin-top:30px}button{background-color:#3b82f6;color:#fff;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600;transition:all .2s ease;margin-left:15px;box-shadow:0 4px 6px rgba(50,50,93,.11),0 1px 3px rgba(0,0,0,.08)}button:hover{background-color:#2563eb;transform:translateY(-1px);box-shadow:0 6px 8px rgba(50,50,93,.13),0 2px 4px rgba(0,0,0,.1)}button:active{transform:translateY(1px)}#recordList{margin-top:40px;border:none;padding:0;width:95%;max-width:1100px;margin-left:auto;margin-right:auto}.record-list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:15px}#recordList h2{font-size:1.8em;color:#3b82f6;font-weight:700;margin:0}#recordTable{width:100%;border-collapse:collapse;border-spacing:0;border-radius:10px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.05)}#recordTable th,#recordTable td{padding:14px;text-align:left;border-bottom:1px solid #e9ecef}#recordTable th{background-color:#f8f9fa;color:#6c757d;font-weight:600;text-transform:uppercase;font-size:.85em;letter-spacing:.05em}#recordTable td{background-color:#fff;color:#495057;transition:background-color .2s ease}#recordTable tbody tr:hover td{background-color:#f1f5f9}.action-buttons{display:flex;gap:8px}.action-buttons button{padding:8px;background-color:transparent;color:#6c757d;font-size:.9em;box-shadow:none}.action-buttons button:hover{background-color:rgba(59,130,246,.1);color:#3b82f6;transform:none}.status-select{padding:6px 10px;border-radius:6px;border:1px solid #ced4da;background-color:#fff}th.checkbox-col{width:40px;text-align:center}#filterSearch{display:flex;gap:15px;justify-content:space-between;align-items:center;margin-bottom:25px;flex-wrap:wrap}.filter-group{display:flex;gap:10px;align-items:center}#filterSearch input,#filterSearch select{padding:12px;font-size:15px}.popup-message{display:none;position:fixed;top:20px;left:50%;transform:translateX(-50%);background-color:#28a745;color:#fff;padding:15px 25px;border-radius:8px;box-shadow:0 5px 15px rgba(0,0,0,.1);z-index:1001;opacity:0;transition:opacity .3s ease,transform .3s ease}.popup-message.show{display:block;opacity:1;transform:translateX(-50%) translateY(10px)}.popup-message.error{background-color:#dc3545}
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 9999; display: flex; justify-content: center; align-items: center; font-size: 1.5em; color: #3b82f6; }
+        @media print{body *{visibility:hidden}.print-section,.print-section *{visibility:visible}.print-section{position:absolute;left:0;top:0;width:100%;align-items:center}.container,#recordList{display:none}.transfer-order{width:283.46px;height:708.66px;margin:10px 0;padding:15px;border:1px solid #000;border-radius:10px;page-break-inside:avoid;display:flex;flex-direction:column;justify-content:space-between}.transfer-order h2{font-size:1.1em;text-align:center;margin-bottom:8px;color:#000;border-bottom:1px solid #ddd;padding-bottom:5px}.transfer-order-item{border:1px solid #ddd;padding:6px;margin-bottom:6px;border-radius:3px;font-size:.8em;word-wrap:break-word}.signature-line{border-bottom:1px dashed #777;width:70%;margin-top:10px}.version-number{position:absolute;top:10px;left:10px;font-size:.8em;color:#555}}
+    </style>
+</head>
+<body>
+
+<div id="loader" style="display: none;"><i class="fa fa-spinner fa-spin"></i>&nbsp; Loading...</div>
+
+<div class="container">
+    <h1><i class="fa fa-file-alt"></i> Document Tracker (Google Sheets)</h1>
+    <label for="description"><i class="fa fa-file-text"></i> Document Description:</label>
+    <textarea id="description" rows="3" required placeholder="e.g., Invoices, Contracts, Memos..."></textarea>
+    <div class="form-row" style="margin-top: 25px;">
+        <div><label for="driverName"><i class="fa fa-user"></i> Driver Name:</label><input type="text" id="driverName" required></div>
+        <div><label for="date"><i class="fa fa-calendar-alt"></i> Date:</label><input type="text" id="date" required></div>
+        <div><label for="status"><i class="fa fa-tasks"></i> Initial Status:</label><select id="status"><option value="Pending">Pending</option><option value="In Transit">In Transit</option></select></div>
+    </div>
+    <div>
+        <label><i class="fa fa-building"></i> Select Branches to Send:</label>
+        <div id="branch-checkboxes"></div>
+    </div>
+    <div class="button-group">
+        <button onclick="processBatch(false)"><i class="fa fa-save"></i> Generate & Save Records</button>
+        <button onclick="processBatch(true)"><i class="fa fa-print"></i> Generate & Print Orders</button>
+        <button onclick="resetForm()"><i class="fa fa-undo"></i> Reset Form</button>
+    </div>
+</div>
+
+<div id="recordList">
+    <div class="record-list-header">
+        <h2><i class="fa fa-list"></i> Saved Records</h2>
+        <button onclick="printSelectedRecords()"><i class="fa fa-print"></i> Print Selected</button>
+    </div>
+    <div id="filterSearch">
+        <div class="filter-group">
+            <select id="categoryFilter"><option value="">All Categories</option><option value="driverName">Driver Name</option><option value="branch">Branch</option><option value="status">Status</option><option value="trackingNumber">Tracking Number</option></select>
+            <input type="text" id="searchTerms" placeholder="Search Terms">
+        </div>
+    </div>
+    <table id="recordTable">
+        <thead><tr><th class="checkbox-col"><input type="checkbox" id="selectAllCheckbox" title="Select All"></th><th>Tracking #</th><th>Driver</th><th>Branch</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="recordTableBody"></tbody>
+    </table>
+</div>
+
+<div class="print-section" id="printSection"></div>
+<div id="popupMessage" class="popup-message"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    // --- CONFIGURATION ---
+    const SCRIPT_URL = "PASTE_YOUR_WEB_APP_URL_HERE"; // <--- PASTE YOUR URL HERE
+
+    flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
+    const branchOptions = [ "نادى هليوبوليس", "تلال السخنه", "جاردنز السخنه", "لازوردی بای", "الدبلوماسيين", "ستيلا", "كاسكادا", "تلال الساحل", "لافيستا بای", "سوان ليك", "الافيستا رأس الحكمة", "دبلوماسيين - خضار", "هاسيندا ريد - خضار", "فوكا باي", "القطامية", "بالم هيلز رايد" ];
+    const statusOptions = ["Pending", "In Transit", "Delivered", "Problem"];
+    let allRecords = []; // Local cache for records
+
+    // --- UI & HELPER FUNCTIONS ---
+    const loader = document.getElementById('loader');
+    function showLoader() { loader.style.display = 'flex'; }
+    function hideLoader() { loader.style.display = 'none'; }
+    function showPopupMessage(message, isError = false) { /* ... same as before ... */ }
+    function populateBranchCheckboxes() { /* ... same as before ... */ }
+    function generateTrackingNumber() { return `TRACK-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`.toUpperCase(); }
+    
+    // Minified versions of unchanged functions to save space
+    showPopupMessage=function(t,e=!1){const o=document.getElementById("popupMessage");o.textContent=t,o.className=`popup-message ${e?"error":""}`,o.classList.add("show"),setTimeout(()=>o.classList.remove("show"),3e3)};populateBranchCheckboxes=function(){document.getElementById("branch-checkboxes").innerHTML=branchOptions.map(t=>`<label class="checkbox-label"><input type="checkbox" value="${t}" name="branch"> ${t}</label>`).join("")};
+
+    // --- API COMMUNICATION ---
+    async function apiRequest(action, data = {}) {
+        showLoader();
+        try {
+            const res = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action, ...data })
+            });
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return await res.json();
+        } catch (error) {
+            console.error('API Request Failed:', error);
+            showPopupMessage('An error occurred. Check the console.', true);
+            return { success: false, message: error.message };
+        } finally {
+            hideLoader();
+        }
+    }
+
+    // --- CORE LOGIC ---
+    async function processBatch(shouldPrint = false) {
+        const driverName = document.getElementById('driverName').value;
+        const date = document.getElementById('date').value;
+        const description = document.getElementById('description').value;
+        const status = document.getElementById('status').value;
+        const selectedBranches = Array.from(document.querySelectorAll('#branch-checkboxes input:checked')).map(cb => cb.value);
+
+        if (!description || !driverName || !date || selectedBranches.length === 0) {
+            return showPopupMessage('Please fill all fields and select at least one branch.', true);
+        }
+
+        showLoader();
+        let recordsToPrint = [];
+        const creationTimestamp = new Date().toLocaleString();
+        
+        for (const branch of selectedBranches) {
+            const record = { trackingNumber: generateTrackingNumber(), creationTimestamp, driverName, branch, date, description, status };
+            const result = await apiRequest('create', { record });
+            if (!result.success) {
+                showPopupMessage(`Failed to save record for ${branch}.`, true);
+                continue;
+            }
+            if (shouldPrint) recordsToPrint.push(record);
+        }
+        
+        hideLoader();
+        if (recordsToPrint.length > 0) printMultipleRecords(recordsToPrint);
+        showPopupMessage(`${selectedBranches.length} records processed.`);
+        resetForm();
+        fetchAndRenderRecords(); // Refresh the table with new data
+    }
+    
+    async function fetchAndRenderRecords() {
+        showLoader();
+        try {
+            const res = await fetch(SCRIPT_URL);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            allRecords = await res.json();
+            // Sort by creation timestamp descending
+            allRecords.sort((a, b) => new Date(b.creationTimestamp) - new Date(a.creationTimestamp));
+            renderTable();
+        } catch (error) {
+            console.error('Fetch Records Failed:', error);
+            showPopupMessage('Could not load data from Google Sheets.', true);
+        } finally {
+            hideLoader();
+        }
+    }
+
+    function renderTable() {
+        const recordTableBody = document.getElementById('recordTableBody');
+        const searchTerm = document.getElementById('searchTerms').value.toUpperCase();
+        const category = document.getElementById('categoryFilter').value;
+
+        const filteredRecords = allRecords.filter(record => 
+            !searchTerm || !category || String(record[category] || '').toUpperCase().includes(searchTerm)
+        );
+
+        recordTableBody.innerHTML = filteredRecords.map(record => {
+            const statusDropdown = `<select class="status-select" onchange="updateStatus('${record.id}', this.value)">
+                ${statusOptions.map(opt => `<option value="${opt}" ${record.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+            </select>`;
+            return `<tr>
+                <td class="checkbox-col"><input type="checkbox" class="record-checkbox" value="${record.id}"></td>
+                <td>${record.trackingNumber}</td><td>${record.driverName}</td><td>${record.branch}</td><td>${record.date}</td>
+                <td>${statusDropdown}</td>
+                <td><div class="action-buttons">
+                    <button title="Print" onclick="printSingleRecord('${record.id}')"><i class="fa fa-print"></i></button>
+                    <button title="Delete" onclick="deleteRecord('${record.id}')"><i class="fa fa-trash"></i></button>
+                </div></td></tr>`;
+        }).join('');
+    }
+
+    async function updateStatus(recordId, newStatus) {
+        const result = await apiRequest('updateStatus', { id: recordId, status: newStatus });
+        if (result.success) {
+            showPopupMessage('Status updated!');
+            const record = allRecords.find(r => r.id == recordId);
+            if (record) record.status = newStatus;
+            renderTable(); // Re-render to reflect change immediately
+        }
+    }
+
+    async function deleteRecord(recordId) {
+        if (confirm("Are you sure you want to permanently delete this record?")) {
+            const result = await apiRequest('delete', { id: recordId });
+            if (result.success) {
+                showPopupMessage('Record deleted.');
+                allRecords = allRecords.filter(r => r.id != recordId);
+                renderTable();
+            }
+        }
+    }
+    
+    function resetForm() { /* ... same as before ... */ }
+    resetForm=function(){document.getElementById("driverName").value="",document.getElementById("description").value="",document.querySelectorAll("#branch-checkboxes input:checked").forEach(t=>t.checked=!1),flatpickr("#date",{}).setDate(new Date)};
+    
+    function printSelectedRecords() { /* ... same as before ... */ }
+    printSelectedRecords=function(){const t=Array.from(document.querySelectorAll(".record-checkbox:checked")).map(t=>t.value);if(0===t.length)return showPopupMessage("Please select records to print.",!0);const e=allRecords.filter(e=>t.includes(e.id.toString()));printMultipleRecords(e)};
+    
+    function printSingleRecord(recordId) { /* ... same from before ... */ }
+    printSingleRecord=function(t){const e=allRecords.find(e=>e.id==t);e?printMultipleRecords([e]):showPopupMessage("Record not found.",!0)};
+
+    function printMultipleRecords(records) { /* ... same as before ... */ }
+    printMultipleRecords=function(t){let e='<div class="version-number">v 2.0 Sheets</div>';t.forEach(t=>{for(let o=0;o<2;o++)e+=`
+                    <div class="transfer-order">
+                        <h2>Document Transfer Order</h2>
+                        <div class="transfer-order-item"><strong>Tracking #:</strong> ${t.trackingNumber}</div>
+                        <div class="transfer-order-item"><strong>Created:</strong> ${t.creationTimestamp}</div>
+                        <div class="transfer-order-item"><strong>Driver:</strong> ${t.driverName}</div>
+                        <div class="transfer-order-item"><strong>Branch:</strong> ${t.branch}</div>
+                        <div class="transfer-order-item"><strong>Date:</strong> ${t.date}</div>
+                        <div class="transfer-order-item"><strong>Desc:</strong> ${t.description}</div>
+                        <div class="transfer-order-item"><strong>Status:</strong> ${t.status}</div>
+                        <div class="transfer-order-item"><strong>Copy:</strong> ${0===o?"User":"Driver"}</div>
+                        <p><strong>Driver Sig:</strong><span class="signature-line"></span></p>
+                        <p><strong>Receiver Sig:</strong><span class="signature-line"></span></p>
+                    </div>`,1===o&&(e+='<div style="page-break-after: always;"></div>')}),document.getElementById("printSection").innerHTML=e,window.print()};
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', () => {
+        populateBranchCheckboxes();
+        fetchAndRenderRecords();
+        document.getElementById('searchTerms').addEventListener('input', renderTable);
+        document.getElementById('categoryFilter').addEventListener('change', renderTable);
+        document.getElementById('selectAllCheckbox').addEventListener('change', e => {
+            document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = e.target.checked);
+        });
+    });
+</script>
+
+</body>
+</html>
