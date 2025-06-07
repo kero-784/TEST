@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Tracker (Server Search)</title>
+    <title>Document Tracker (Google Sheets)</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,7 +21,7 @@
 <div id="loader" style="display: none;"><i class="fa fa-spinner fa-spin"></i>  Loading...</div>
 
 <div class="container">
-    <h1><i class="fa fa-file-alt"></i> Document Tracker (Server Search)</h1>
+    <h1><i class="fa fa-file-alt"></i> Document Tracker (Google Sheets)</h1>
     <label for="description"><i class="fa fa-file-text"></i> Document Description:</label>
     <textarea id="description" rows="3" required placeholder="e.g., Invoices, Contracts, Memos..."></textarea>
     <div class="form-row" style="margin-top: 25px;">
@@ -29,10 +29,13 @@
         <div><label for="date"><i class="fa fa-calendar-alt"></i> Date:</label><input type="text" id="date" required></div>
         <div><label for="status"><i class="fa fa-tasks"></i> Initial Status:</label><select id="status"><option value="Pending">Pending</option><option value="In Transit">In Transit</option></select></div>
     </div>
-    <div><label><i class="fa fa-building"></i> Select Branches to Send:</label><div id="branch-checkboxes"></div></div>
+    <div>
+        <label><i class="fa fa-building"></i> Select Branches to Send:</label>
+        <div id="branch-checkboxes"></div>
+    </div>
     <div class="button-group">
-        <button onclick="processBatch(false)"><i class="fa fa-save"></i> Save New</button>
-        <button onclick="processBatch(true)"><i class="fa fa-print"></i> Save & Print</button>
+        <button onclick="processBatch(false)"><i class="fa fa-save"></i> Generate & Save Records</button>
+        <button onclick="processBatch(true)"><i class="fa fa-print"></i> Generate & Print Orders</button>
         <button onclick="resetForm()"><i class="fa fa-undo"></i> Reset Form</button>
     </div>
 </div>
@@ -45,7 +48,7 @@
     <div id="filterSearch">
         <div class="filter-group">
             <select id="categoryFilter"><option value="">All Categories</option><option value="driverName">Driver Name</option><option value="branch">Branch</option><option value="status">Status</option><option value="trackingNumber">Tracking Number</option></select>
-            <input type="text" id="searchTerms" placeholder="Search saved records...">
+            <input type="text" id="searchTerms" placeholder="Search Terms">
         </div>
     </div>
     <table id="recordTable">
@@ -60,12 +63,12 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
     // --- CONFIGURATION ---
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHhfraaWYTbw1P2pL-9SicKZAEhKm9BrzuinttDfusCUCtiZcwcbF4WiIHMSW7F8Tr/exec"; 
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyrrY5Lx_mWHebfUHT4tMyTvnx7vEGm4MHSHncJftcg3k00kHWniCKXwtu-63A3wNE3/exec"; // <--- PASTE YOUR DEPLOYED URL
 
     flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
     const branchOptions = [ "نادى هليوبوليس", "تلال السخنه", "جاردنز السخنه", "لازوردی بای", "الدبلوماسيين", "ستيلا", "كاسكادا", "تلال الساحل", "لافيستا بای", "سوان ليك", "الافيستا رأس الحكمة", "دبلوماسيين - خضار", "هاسيندا ريد - خضار", "فوكا باي", "القطامية", "بالم هيلز رايد" ];
     const statusOptions = ["Pending", "In Transit", "Delivered", "Problem"];
-    let displayedRecords = []; // Local cache for currently displayed records
+    let allRecords = [];
 
     // --- UI & HELPER FUNCTIONS ---
     const loader = document.getElementById('loader');
@@ -74,83 +77,118 @@
     function showPopupMessage(t,e=!1){const o=document.getElementById("popupMessage");o.textContent=t,o.className=`popup-message ${e?"error":""}`,o.classList.add("show"),setTimeout(()=>o.classList.remove("show"),3e3)}
     function populateBranchCheckboxes(){document.getElementById("branch-checkboxes").innerHTML=branchOptions.map(t=>`<label class="checkbox-label"><input type="checkbox" value="${t}" name="branch"> ${t}</label>`).join("")}
     function generateTrackingNumber(){return`TRACK-${Date.now().toString(36)}-${Math.random().toString(36).substring(2,7)}`.toUpperCase()}
-    function debounce(func, delay) {
-        let timeout;
-        return function(...args) {
-            const context = this;
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(context, args), delay);
-        };
-    }
 
     // --- API COMMUNICATION ---
     async function apiRequest(action, data = {}) {
-        if (!SCRIPT_URL.startsWith("https://script.google.com/")) { showPopupMessage("ERROR: Please paste your Web App URL.", true); return null; }
+        if (!SCRIPT_URL.startsWith("https://script.google.com/")) {
+            showPopupMessage("ERROR: Please paste your Web App URL in the SCRIPT_URL constant.", true);
+            return null;
+        }
         showLoader();
         try {
-            const res = await fetch(SCRIPT_URL, { method: 'POST', redirect: "follow", body: JSON.stringify({ action, ...data }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
+            const res = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                redirect: "follow", 
+                body: JSON.stringify({ action, ...data }),
+                headers: { "Content-Type": "text/plain;charset=utf-8" }
+            });
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             return await res.json();
-        } catch (error) { console.error('API Request Failed:', error); showPopupMessage('An error occurred. Check the console.', true); return null; }
-        finally { hideLoader(); }
+        } catch (error) {
+            console.error('API Request Failed:', error);
+            showPopupMessage('An error occurred. Check the console.', true);
+            return null;
+        } finally {
+            hideLoader();
+        }
     }
 
     // --- CORE LOGIC ---
     async function processBatch(shouldPrint = false) {
-        const driverName = document.getElementById('driverName').value, date = document.getElementById('date').value, description = document.getElementById('description').value, status = document.getElementById('status').value;
+        const driverName = document.getElementById('driverName').value;
+        const date = document.getElementById('date').value;
+        const description = document.getElementById('description').value;
+        const status = document.getElementById('status').value;
         const selectedBranches = Array.from(document.querySelectorAll('#branch-checkboxes input:checked')).map(cb => cb.value);
-        if (!description || !driverName || !date || selectedBranches.length === 0) return showPopupMessage('Please fill all fields and select at least one branch.', true);
+
+        if (!description || !driverName || !date || selectedBranches.length === 0) {
+            return showPopupMessage('Please fill all fields and select at least one branch.', true);
+        }
         
-        let recordsToPrint = [], creationTimestamp = new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" });
+        showLoader();
+        let recordsToPrint = [];
+        const creationTimestamp = new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" });
+        
         for (const branch of selectedBranches) {
             const record = { trackingNumber: generateTrackingNumber(), creationTimestamp, driverName, branch, date, description, status };
             const result = await apiRequest("create", { record });
-            if (result && result.success) { if (shouldPrint) recordsToPrint.push(record); }
-            else { showPopupMessage(`Failed to save for ${branch}.`, true); }
+            if (result && result.success) {
+                if (shouldPrint) recordsToPrint.push(record);
+            } else {
+                showPopupMessage(`Failed to save record for ${branch}.`, true);
+            }
         }
+
+        hideLoader();
         if (recordsToPrint.length > 0) printMultipleRecords(recordsToPrint);
         showPopupMessage(`${selectedBranches.length} records processed.`);
         resetForm();
-        searchAndRenderRecords(); // Refresh the table
+        fetchAndRenderRecords();
     }
     
-    // RENAMED from fetchAndRenderRecords for clarity
-    async function searchAndRenderRecords() {
-        const searchTerm = document.getElementById('searchTerms').value;
-        const category = document.getElementById('categoryFilter').value;
-        
-        const result = await apiRequest('search', { term: searchTerm, category: category });
+    async function fetchAndRenderRecords() {
+        showLoader();
+        const result = await apiRequest('fetchAll');
+        hideLoader();
         
         if (!result || !Array.isArray(result)) {
-            console.error('Search Failed: API did not return a valid array.', result);
-            showPopupMessage('Could not load data.', true);
-            displayedRecords = [];
+            console.error('Fetch Failed: API did not return a valid array.', result);
+            showPopupMessage('Could not load data. Response was invalid.', true);
+            allRecords = [];
         } else {
-            displayedRecords = result;
+            allRecords = result;
         }
 
-        displayedRecords.sort((a, b) => (new Date(b.creationTimestamp).getTime() || 0) - (new Date(a.creationTimestamp).getTime() || 0));
+        allRecords.sort((a, b) => {
+            const timeA = a && a.creationTimestamp ? new Date(a.creationTimestamp).getTime() : 0;
+            const timeB = b && b.creationTimestamp ? new Date(b.creationTimestamp).getTime() : 0;
+            return timeB - timeA;
+        });
+        
         renderTable();
     }
 
     function renderTable() {
         const recordTableBody = document.getElementById('recordTableBody');
-        if (displayedRecords.length === 0) {
+        const searchTerm = document.getElementById('searchTerms').value.toUpperCase();
+        const category = document.getElementById('categoryFilter').value;
+
+        const filteredRecords = allRecords.filter(record => {
+            if (typeof record !== 'object' || record === null) return false;
+            return !searchTerm || !category || String(record[category] || '').toUpperCase().includes(searchTerm);
+        });
+
+        if (filteredRecords.length === 0) {
             recordTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px;">No records found.</td></tr>`;
             return;
         }
-        recordTableBody.innerHTML = displayedRecords.map(t => {
+
+        recordTableBody.innerHTML = filteredRecords.map(t => {
             const statusDropdown = `<select class="status-select" onchange="updateStatus('${t.id}', this.value)">
                 ${statusOptions.map(e => `<option value="${e}" ${t.status === e ? 'selected' : ''}>${e}</option>`).join('')}
             </select>`;
             return `<tr>
                 <td class="checkbox-col"><input type="checkbox" class="record-checkbox" value="${t.id}"></td>
-                <td>${t.trackingNumber||''}</td><td>${t.driverName||''}</td><td>${t.branch||''}</td>
-                <td>${t.date||''}</td><td>${statusDropdown}</td>
+                <td>${t.trackingNumber || ''}</td>
+                <td>${t.driverName || ''}</td>
+                <td>${t.branch || ''}</td>
+                <td>${t.date || ''}</td>
+                <td>${statusDropdown}</td>
                 <td><div class="action-buttons">
                     <button title="Print" onclick="printSingleRecord('${t.id}')"><i class="fa fa-print"></i></button>
                     <button title="Delete" onclick="deleteRecord('${t.id}')"><i class="fa fa-trash"></i></button>
-                </div></td></tr>`;
+                </div></td>
+            </tr>`;
         }).join('');
     }
 
@@ -158,35 +196,33 @@
         const result = await apiRequest("updateStatus", {id: recordId, status: newStatus});
         if (result && result.success) {
             showPopupMessage("Status updated!");
-            const record = displayedRecords.find(r => r.id == recordId);
+            const record = allRecords.find(r => r.id == recordId);
             if (record) record.status = newStatus;
         }
     }
 
     async function deleteRecord(recordId) {
-        if (confirm("Permanently delete this record?")) {
+        if (confirm("Are you sure you want to permanently delete this record?")) {
             const result = await apiRequest("delete", {id: recordId});
             if (result && result.success) {
                 showPopupMessage("Record deleted.");
-                displayedRecords = displayedRecords.filter(r => r.id != recordId);
+                allRecords = allRecords.filter(r => r.id != recordId);
                 renderTable();
             }
         }
     }
     
     function resetForm(){document.getElementById("driverName").value="",document.getElementById("description").value="",document.querySelectorAll("#branch-checkboxes input:checked").forEach(t=>t.checked=!1),flatpickr("#date",{}).setDate(new Date)}
-    function printSelectedRecords(){const t=Array.from(document.querySelectorAll(".record-checkbox:checked")).map(t=>t.value);if(0===t.length)return showPopupMessage("Please select records to print.",!0);const e=displayedRecords.filter(e=>t.includes(String(e.id)));printMultipleRecords(e)}
-    function printSingleRecord(t){const e=displayedRecords.find(e=>String(e.id)===t);e?printMultipleRecords([e]):showPopupMessage("Record not found.",!0)}
-    function printMultipleRecords(t){let e='<div class="version-number">v 3.0 Server Search</div>';t.forEach(t=>{for(let o=0;o<2;o++)e+=`\n<div class="transfer-order"><h2>Document Transfer Order</h2><div class="transfer-order-item"><strong>Tracking #:</strong> ${t.trackingNumber||""}</div><div class="transfer-order-item"><strong>Created:</strong> ${t.creationTimestamp||""}</div><div class="transfer-order-item"><strong>Driver:</strong> ${t.driverName||""}</div><div class="transfer-order-item"><strong>Branch:</strong> ${t.branch||""}</div><div class="transfer-order-item"><strong>Date:</strong> ${t.date||""}</div><div class="transfer-order-item"><strong>Desc:</strong> ${t.description||""}</div><div class="transfer-order-item"><strong>Status:</strong> ${t.status||""}</div><div class="transfer-order-item"><strong>Copy:</strong> ${0===o?"User":"Driver"}</div><p><strong>Driver Sig:</strong><span class="signature-line"></span></p><p><strong>Receiver Sig:</strong><span class="signature-line"></span></p></div>`,1===o&&(e+='<div style="page-break-after: always;"></div>')}),document.getElementById("printSection").innerHTML=e,window.print()}
+    function printSelectedRecords(){const t=Array.from(document.querySelectorAll(".record-checkbox:checked")).map(t=>t.value);if(0===t.length)return showPopupMessage("Please select records to print.",!0);const e=allRecords.filter(e=>t.includes(String(e.id)));printMultipleRecords(e)}
+    function printSingleRecord(t){const e=allRecords.find(e=>String(e.id)===t);e?printMultipleRecords([e]):showPopupMessage("Record not found.",!0)}
+    function printMultipleRecords(t){let e='<div class="version-number">v 2.3 Sheets</div>';t.forEach(t=>{for(let o=0;o<2;o++)e+=`\n                    <div class="transfer-order">\n                        <h2>Document Transfer Order</h2>\n                        <div class="transfer-order-item"><strong>Tracking #:</strong> ${t.trackingNumber||""}</div>\n                        <div class="transfer-order-item"><strong>Created:</strong> ${t.creationTimestamp||""}</div>\n                        <div class="transfer-order-item"><strong>Driver:</strong> ${t.driverName||""}</div>\n                        <div class="transfer-order-item"><strong>Branch:</strong> ${t.branch||""}</div>\n                        <div class="transfer-order-item"><strong>Date:</strong> ${t.date||""}</div>\n                        <div class="transfer-order-item"><strong>Desc:</strong> ${t.description||""}</div>\n                        <div class="transfer-order-item"><strong>Status:</strong> ${t.status||""}</div>\n                        <div class="transfer-order-item"><strong>Copy:</strong> ${0===o?"User":"Driver"}</div>\n                        <p><strong>Driver Sig:</strong><span class="signature-line"></span></p>\n                        <p><strong>Receiver Sig:</strong><span class="signature-line"></span></p>\n                    </div>`,1===o&&(e+='<div style="page-break-after: always;"></div>')}),document.getElementById("printSection").innerHTML=e,window.print()}
 
     // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
         populateBranchCheckboxes();
-        searchAndRenderRecords(); // Initial load of all records
-
-        const debouncedSearch = debounce(searchAndRenderRecords, 400);
-        document.getElementById('searchTerms').addEventListener('input', debouncedSearch);
-        document.getElementById('categoryFilter').addEventListener('change', searchAndRenderRecords);
+        fetchAndRenderRecords();
+        document.getElementById('searchTerms').addEventListener('input', renderTable);
+        document.getElementById('categoryFilter').addEventListener('change', renderTable);
         document.getElementById('selectAllCheckbox').addEventListener('change', e => {
             document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = e.target.checked);
         });
