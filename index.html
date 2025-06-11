@@ -559,8 +559,10 @@
         }
 
         /*************************************************/
-        /* ROBUST POPUP CONTROL SYSTEM                   */
+        /* ROBUST POPUP CONTROL SYSTEM (UPDATED)         */
         /*************************************************/
+        let currentSearchController; // For AbortController
+
         function openPopup(popupId) {
             const popup = document.getElementById(popupId);
             const overlay = document.getElementById('overlay');
@@ -575,11 +577,40 @@
         function closeAllPopups() {
             const openPopups = document.querySelectorAll('.popup-base.show');
             const overlay = document.getElementById('overlay');
+
+            // Abort any ongoing fetch request before closing
+            if (currentSearchController) {
+                currentSearchController.abort();
+                console.log("Search aborted due to popup closure.");
+            }
+
             openPopups.forEach(p => p.classList.remove('show'));
-            if (overlay) overlay.classList.remove('show');
+            if (overlay) {
+                overlay.classList.remove('show');
+                overlay.removeEventListener('click', closeAllPopups);
+            }
+            
             document.body.classList.remove('popup-open');
-            overlay.removeEventListener('click', closeAllPopups);
             document.removeEventListener('keydown', handleEscKey);
+
+            // --- Specific cleanup for the Inquiry Popup ---
+            const inquirySearchBtn = document.getElementById('searchBtn');
+            if (inquirySearchBtn) {
+                inquirySearchBtn.disabled = false;
+            }
+            const inquiryLoader = document.getElementById('loader');
+            if (inquiryLoader) {
+                inquiryLoader.style.display = 'none';
+            }
+            const queryMessage = document.getElementById('queryMessage');
+            if (queryMessage) {
+                 queryMessage.style.display = 'none';
+            }
+            const resultsContainer = document.getElementById('resultsContainer');
+            if(resultsContainer) {
+                resultsContainer.style.display = 'none';
+                resultsContainer.innerHTML = '';
+            }
         }
 
         function handleEscKey(event) { if (event.key === 'Escape') { closeAllPopups(); } }
@@ -595,7 +626,7 @@
         function openInquiryPopup() { openPopup('inquiryPopup'); }
 
         /*************************************************/
-        /* SCRIPT FOR INQUIRY POPUP                      */
+        /* SCRIPT FOR INQUIRY POPUP (UPDATED)            */
         /*************************************************/
         const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxBZi1K-z8ecjbukUcfsZWkPgBqSw0H2xDTpZBcaIdoKQS9Y0D2DJ54gbf0n6uvwmYXRw/exec';
         const URL_PLACEHOLDER_STRING = 'YOUR_GAS_URL_PLACEHOLDER_REPLACE_ME';
@@ -647,16 +678,37 @@
             if (criticalConfigErrorInquiry) { showMessageInquiry('خطأ حرج: لم يتم تكوين رابط Google Apps Script.', 'error'); return; }
             const searchType = searchTypeSelect.value; const searchTerm = searchTermInput.value.trim();
             if (!searchTerm) { showMessageInquiry('الرجاء إدخال قيمة للبحث.', 'error'); searchTermInput.focus(); return; }
+            
+            // Set up AbortController for the fetch request
+            currentSearchController = new AbortController();
+            const signal = currentSearchController.signal;
+
             hideMessageInquiry(); resultsContainer.style.display = 'none'; resultsContainer.innerHTML = '';
             loader.style.display = 'block'; searchBtn.disabled = true;
             const params = new URLSearchParams({ action: 'inquireData', searchType: searchType, searchTerm: searchTerm });
+            
             try {
-                const response = await fetch(`${GAS_WEB_APP_URL}?${params.toString()}`, { method: 'GET', mode: 'cors' });
+                const response = await fetch(`${GAS_WEB_APP_URL}?${params.toString()}`, { 
+                    method: 'GET', 
+                    mode: 'cors',
+                    signal: signal // Pass the signal to the fetch request
+                });
                 if (!response.ok) { throw new Error(`خطأ في الشبكة أو السيرفر: ${response.status} ${response.statusText}`); }
                 const result = await response.json();
                 if (result.success && result.data) { displayResults(result.data); } else { showMessageInquiry(result.error || result.message || 'حدث خطأ غير متوقع.', 'error'); }
-            } catch (error) { console.error('[Fetch API] CATCH BLOCK:', error); showMessageInquiry(`فشل الاستعلام: ${error.message}`, 'error');
-            } finally { loader.style.display = 'none'; searchBtn.disabled = false; }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    // This error is expected if the user closes the popup, so we can ignore it or log it quietly.
+                    console.log('Fetch aborted.');
+                } else {
+                    console.error('[Fetch API] CATCH BLOCK:', error);
+                    showMessageInquiry(`فشل الاستعلام: ${error.message}`, 'error');
+                }
+            } finally {
+                loader.style.display = 'none'; 
+                searchBtn.disabled = false;
+                currentSearchController = null; // Clear the controller after the operation is complete
+            }
         });
     </script>
 </body>
