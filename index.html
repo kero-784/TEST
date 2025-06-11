@@ -306,7 +306,8 @@
         <div id="databasePopup" class="popup-base">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3>Database</h3>
-                <button onclick="closeAllPopups()" class="btn btn-secondary btn-sm"><i class="fas fa-times"></i> Close</button>
+                <!-- MODIFIED BUTTON: Removed onclick, added class -->
+                <button type="button" class="btn btn-secondary btn-sm popup-close-btn"><i class="fas fa-times"></i> Close</button>
             </div>
             <div id="databaseTableContainer">
                 <table id="databaseTable">
@@ -319,7 +320,8 @@
         <!-- Popup for Inquiry App -->
         <div id="inquiryPopup" class="popup-base">
             <div class="popup-header-controls">
-                <button onclick="closeAllPopups()" class="btn btn-danger btn-sm" style="margin-left: auto;"><i class="fas fa-times"></i> إغلاق</button>
+                <!-- MODIFIED BUTTON: Removed onclick, added class -->
+                <button type="button" class="btn btn-danger btn-sm popup-close-btn" style="margin-left: auto;"><i class="fas fa-times"></i> إغلاق</button>
             </div>
             <div class="popup-content-area">
                 <div class="app-container">
@@ -427,11 +429,23 @@
             }
             return data;
         }
-
+        
+        // MODIFIED window.onload to include the centralized click listener
         window.onload = function () {
             loadEntriesFromLocalStorageAndUpdateTable();
             autoLoadDatabase();
             toggleCurrentPriceField();
+
+            // Centralized event listener for all popup close buttons
+            // This is more robust than using onclick="" in HTML
+            document.addEventListener('click', function (event) {
+                // Check if the clicked element or its parent is a close button
+                if (event.target.closest('.popup-close-btn')) {
+                    event.preventDefault(); // Prevent any default button action
+                    event.stopPropagation(); // Stop the click from bubbling up
+                    closeAllPopups();
+                }
+            });
         };
 
         function loadEntriesFromLocalStorageAndUpdateTable() { entries = loadEntriesFromLocalStorage(); updateEntriesTable(); }
@@ -578,10 +592,8 @@
             const openPopups = document.querySelectorAll('.popup-base.show');
             const overlay = document.getElementById('overlay');
 
-            // Abort any ongoing fetch request before closing
             if (currentSearchController) {
                 currentSearchController.abort();
-                console.log("Search aborted due to popup closure.");
             }
 
             openPopups.forEach(p => p.classList.remove('show'));
@@ -593,7 +605,6 @@
             document.body.classList.remove('popup-open');
             document.removeEventListener('keydown', handleEscKey);
 
-            // --- Specific cleanup for the Inquiry Popup ---
             const inquirySearchBtn = document.getElementById('searchBtn');
             if (inquirySearchBtn) {
                 inquirySearchBtn.disabled = false;
@@ -679,7 +690,6 @@
             const searchType = searchTypeSelect.value; const searchTerm = searchTermInput.value.trim();
             if (!searchTerm) { showMessageInquiry('الرجاء إدخال قيمة للبحث.', 'error'); searchTermInput.focus(); return; }
             
-            // Set up AbortController for the fetch request
             currentSearchController = new AbortController();
             const signal = currentSearchController.signal;
 
@@ -691,15 +701,14 @@
                 const response = await fetch(`${GAS_WEB_APP_URL}?${params.toString()}`, { 
                     method: 'GET', 
                     mode: 'cors',
-                    signal: signal // Pass the signal to the fetch request
+                    signal: signal 
                 });
                 if (!response.ok) { throw new Error(`خطأ في الشبكة أو السيرفر: ${response.status} ${response.statusText}`); }
                 const result = await response.json();
                 if (result.success && result.data) { displayResults(result.data); } else { showMessageInquiry(result.error || result.message || 'حدث خطأ غير متوقع.', 'error'); }
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    // This error is expected if the user closes the popup, so we can ignore it or log it quietly.
-                    console.log('Fetch aborted.');
+                    console.log('Fetch aborted by user action.');
                 } else {
                     console.error('[Fetch API] CATCH BLOCK:', error);
                     showMessageInquiry(`فشل الاستعلام: ${error.message}`, 'error');
@@ -707,7 +716,7 @@
             } finally {
                 loader.style.display = 'none'; 
                 searchBtn.disabled = false;
-                currentSearchController = null; // Clear the controller after the operation is complete
+                currentSearchController = null;
             }
         });
     </script>
